@@ -15,15 +15,14 @@
     "dist:intel": "npm run build:renderer && electron-builder --mac --x64"
   },
   "//": "Everything is bundled into dist/ by Vite, so there are no runtime dependencies to ship inside the .app.",
-  "dependencies": {},
   "devDependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
     "concurrently": "^9.1.0",
-    "electron": "^33.0.0",
-    "electron-builder": "^25.1.8",
+    "electron": "^44.4.2",
+    "electron-builder": "^26.15.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.7.0",

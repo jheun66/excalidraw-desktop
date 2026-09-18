@@ -41,8 +41,8 @@ another and it joins the same window as a new tab. Switching is a click or a key
 
 ## Installation
 
-There are no prebuilt downloads yet, so you build the app yourself. You need macOS and
-[Node.js](https://nodejs.org) 20 or later.
+There are no prebuilt downloads yet, so you build the app yourself. You need macOS 13 or later
+(what the bundled Electron requires) and [Node.js](https://nodejs.org) 20 or later.
 
 ```bash
 git clone https://github.com/jheun66/excalidraw-desktop.git
