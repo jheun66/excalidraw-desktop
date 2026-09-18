@@ -1,0 +1,666 @@
+/*
+ * App chrome for excalidraw-desktop.
+ *
+ * The sidebar is a translucent panel sitting on macOS's native "sidebar"
+ * vibrancy (set on the BrowserWindow), so the desktop and whatever is behind
+ * the window blur through it. The window ground is therefore transparent on
+ * macOS — the canvas half paints itself opaque so the drawing surface stays
+ * solid, and only the sidebar and top strip let the material show.
+ *
+ * Everything glassy is expressed as tokens so the same layers work on the
+ * opaque ground used on platforms with no vibrancy.
+ */
+
+:root {
+  --sidebar-w: 236px;
+  --topbar-h: 38px;
+  /* Left inset that keeps controls clear of the macOS traffic lights. */
+  --traffic-lights: 78px;
+  --canvas-top: 0px;
+
+  --bg: #ffffff;
+  /* Stand-in ground where no native vibrancy material exists. */
+  --chrome-base: #f1f1f6;
+  --border: #e5e5ec;
+
+  --text: #1b1b1f;
+  --text-dim: #70707d;
+
+  --accent: #6965db;
+  --accent-ink: #4f4bc4;
+
+  --danger: #c2255c;
+
+  /*
+   * glass — alpha lives in its own pair of tokens so the tint can be dialled
+   * at runtime (View → Sidebar Transparency) without touching any component rule.
+   */
+  --glass-a1: 0.26;
+  --glass-a2: 0.16;
+  --glass-tint: 255, 255, 255;
+  --glass-tint-2: 246, 246, 252;
+
+  --glass-top: rgba(var(--glass-tint), var(--glass-a1));
+  --glass-bottom: rgba(var(--glass-tint-2), var(--glass-a2));
+  --glass-edge: rgba(0, 0, 0, 0.09);
+  --glass-inner: rgba(255, 255, 255, 0.55);
+  --glass-hover: rgba(110, 110, 135, 0.12);
+  --glass-chip: rgba(105, 101, 219, 0.18);
+  --glass-chip-edge: rgba(105, 101, 219, 0.32);
+  --glass-btn: rgba(255, 255, 255, 0.4);
+
+  --radius: 7px;
+  --row-h: 34px;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121215;
+    --chrome-base: #16161a;
+    --border: #292930;
+
+    --text: #e6e6ec;
+    --text-dim: #9494a1;
+
+    --accent: #a8a5ff;
+    --accent-ink: #c2c0ff;
+
+    --danger: #ff8fb1;
+
+    --glass-tint: 44, 44, 54;
+    --glass-tint-2: 24, 24, 30;
+    --glass-edge: rgba(255, 255, 255, 0.11);
+    --glass-inner: rgba(255, 255, 255, 0.08);
+    --glass-hover: rgba(255, 255, 255, 0.09);
+    --glass-chip: rgba(168, 165, 255, 0.22);
+    --glass-chip-edge: rgba(168, 165, 255, 0.38);
+    --glass-btn: rgba(255, 255, 255, 0.1);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #121215;
+  --chrome-base: #16161a;
+  --border: #292930;
+
+  --text: #e6e6ec;
+  --text-dim: #9494a1;
+
+  --accent: #a8a5ff;
+  --accent-ink: #c2c0ff;
+
+  --danger: #ff8fb1;
+
+  --glass-tint: 44, 44, 54;
+  --glass-tint-2: 24, 24, 30;
+  --glass-edge: rgba(255, 255, 255, 0.11);
+  --glass-inner: rgba(255, 255, 255, 0.08);
+  --glass-hover: rgba(255, 255, 255, 0.09);
+  --glass-chip: rgba(168, 165, 255, 0.22);
+  --glass-chip-edge: rgba(168, 165, 255, 0.38);
+  --glass-btn: rgba(255, 255, 255, 0.1);
+}
+
+/* Transparency levels — set on <html> from the View menu. */
+:root[data-glass="clear"] {
+  --glass-a1: 0.12;
+  --glass-a2: 0.06;
+}
+
+:root[data-glass="frosted"] {
+  --glass-a1: 0.46;
+  --glass-a2: 0.36;
+}
+
+/*
+ * macOS has already blurred everything behind the window for us, so a second
+ * backdrop blur just costs GPU time and washes the tint out. Blur is applied
+ * ONLY where there is no native material to sit on — and there the tint has to
+ * carry the whole effect, so it goes back up to near-opaque.
+ */
+:root[data-vibrancy="off"] {
+  --glass-a1: 0.62;
+  --glass-a2: 0.52;
+}
+
+:root[data-vibrancy="off"][data-glass="clear"] {
+  --glass-a1: 0.42;
+  --glass-a2: 0.32;
+}
+
+:root[data-vibrancy="off"][data-glass="frosted"] {
+  --glass-a1: 0.82;
+  --glass-a2: 0.74;
+}
+
+:root[data-vibrancy="off"] .exd-sidebar,
+:root[data-vibrancy="off"] .exd-topbar {
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* No native material behind the window: paint a ground for the glass. */
+:root[data-vibrancy="off"] body {
+  background: var(--chrome-base);
+}
+
+body {
+  font:
+    13px/1.45 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: var(--text);
+  /* Deliberately unpainted: the native vibrancy material is the ground. */
+  background: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+.exd-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.exd-shell {
+  display: flex;
+  height: 100%;
+}
+
+/* ---------------- sidebar ---------------- */
+
+/*
+ * The window handle. A dedicated strip rather than making the whole sidebar
+ * draggable and punching no-drag holes for every control: one drag rect and no
+ * subtraction at all, and it never changes as the tab list re-renders.
+ */
+.exd-drag-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  -webkit-app-region: drag;
+}
+
+.exd-sidebar {
+  position: relative;
+  width: var(--sidebar-w);
+  flex: 0 0 var(--sidebar-w);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding-top: 36px;
+  background: linear-gradient(180deg, var(--glass-top), var(--glass-bottom));
+  /* Hairline divider plus the light catch along the top edge. */
+  box-shadow:
+    inset -1px 0 0 var(--glass-edge),
+    inset 0 1px 0 var(--glass-inner);
+  transition:
+    width 0.22s cubic-bezier(0.32, 0.72, 0, 1),
+    flex-basis 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.exd-shell.is-collapsed {
+  --canvas-top: var(--topbar-h);
+}
+
+.exd-shell.is-collapsed .exd-sidebar {
+  width: 0;
+  flex-basis: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.exd-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 8px 10px 14px;
+}
+
+.exd-sidebar-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.exd-sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.exd-sidebar-sep {
+  width: 1px;
+  height: 14px;
+  margin: 0 3px;
+  background: var(--glass-edge);
+}
+
+.exd-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.exd-icon-btn svg,
+.exd-glass-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.exd-icon-btn:hover {
+  background: var(--glass-hover);
+  color: var(--text);
+}
+
+.exd-file-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.exd-file-list-empty {
+  flex: 1;
+  margin: 0;
+  padding: 2px 14px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/*
+ * Three fixed lanes: status, label, close. The unsaved marker and the close
+ * button own separate columns, so neither can ever land on top of the other.
+ */
+.exd-tab {
+  display: grid;
+  grid-template-columns: 1fr 24px;
+  align-items: center;
+  border-radius: var(--radius);
+}
+
+.exd-tab:hover {
+  background: var(--glass-hover);
+}
+
+/* Selection reads as a frosted chip, the way macOS sidebars do it. */
+.exd-tab.is-active {
+  background: var(--glass-chip);
+  box-shadow: inset 0 0 0 1px var(--glass-chip-edge);
+}
+
+.exd-tab-main {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--row-h);
+  padding: 5px 0 5px 8px;
+  border: 0;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exd-tab-status {
+  display: grid;
+  place-items: center;
+  width: 14px;
+}
+
+.exd-mark {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.exd-mark-broken {
+  background: var(--danger);
+}
+
+.exd-tab-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.exd-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exd-tab.is-active .exd-tab-name {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.exd-tab.is-broken .exd-tab-name {
+  color: var(--danger);
+}
+
+.exd-rename {
+  width: 100%;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+
+.exd-tab-dir {
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exd-tab-close {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.exd-tab-close svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.exd-tab:hover .exd-tab-close,
+.exd-tab.is-active .exd-tab-close,
+.exd-tab-close:focus-visible {
+  opacity: 1;
+}
+
+.exd-tab-close:hover {
+  background: var(--glass-hover);
+  color: var(--text);
+}
+
+.exd-sidebar-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  box-shadow: inset 0 1px 0 var(--glass-edge);
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--accent-ink);
+}
+
+.exd-sidebar-foot .exd-mark {
+  width: 6px;
+  height: 6px;
+}
+
+.exd-foot-quiet {
+  color: var(--text-dim);
+}
+
+.exd-sidebar-foot kbd {
+  margin-left: auto;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--glass-btn);
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
+  font: inherit;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* ---------------- collapsed top strip ---------------- */
+
+.exd-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: var(--traffic-lights);
+  padding-right: 12px;
+  background: linear-gradient(180deg, var(--glass-top), var(--glass-bottom));
+  box-shadow:
+    inset 0 -1px 0 var(--glass-edge),
+    inset 0 1px 0 var(--glass-inner);
+  -webkit-app-region: drag;
+}
+
+.exd-topbar-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exd-glass-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--glass-btn);
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
+  color: var(--text-dim);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.exd-glass-btn:hover {
+  color: var(--text);
+  background: var(--glass-hover);
+}
+
+/* ---------------- canvas ---------------- */
+
+/*
+ * Left transparent so the top strip has the vibrancy material behind it and
+ * not a slab of white. Everything that needs an opaque ground paints it
+ * itself, inset below the strip.
+ */
+.exd-canvas-area {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+}
+
+/*
+ * No -webkit-app-region here at all — deliberately.
+ *
+ * macOS builds the window's drag region by walking the declarations in order,
+ * unioning `drag` rects and subtracting `no-drag` ones. Two things follow.
+ *
+ * `.exd-canvas-area *` used to sit here as a "defensive" rule. It put a no-drag
+ * rect on EVERY node Excalidraw renders — 207 at rest, 359 with a panel open,
+ * climbing as the app is used — and after a few interactions the drag region
+ * stopped working. That is why the window became unmovable once you had
+ * clicked around a little.
+ *
+ * Even a single no-drag rect on `.exd-canvas-area` is wrong: it is declared
+ * after `.exd-topbar` and covers the same strip, so it would subtract the
+ * collapsed-mode title bar right back out. Nothing in the canvas is draggable
+ * to begin with — it is a sibling of the sidebar, and app-region does not
+ * inherit — so the correct number of declarations here is zero.
+ */
+
+.exd-canvas,
+.exd-empty,
+.exd-notice {
+  position: absolute;
+  inset: var(--canvas-top) 0 0 0;
+  /* Opaque on purpose: the drawing surface must not go translucent. */
+  background: var(--bg);
+}
+
+.exd-empty,
+.exd-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.exd-empty h2,
+.exd-notice h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  text-wrap: balance;
+}
+
+.exd-empty p,
+.exd-notice p {
+  margin: 0;
+  max-width: 46ch;
+}
+
+.exd-notice-danger h2 {
+  color: var(--danger);
+}
+
+.exd-notice code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--glass-hover);
+  font-size: 12px;
+}
+
+.exd-empty-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.exd-btn {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.exd-btn:hover {
+  background: var(--glass-hover);
+}
+
+.exd-btn-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.exd-btn-primary:hover {
+  background: var(--accent-ink);
+}
+
+/* ---------------- a11y ---------------- */
+
+/*
+ * Scoped to this app's own chrome. A bare `:focus-visible` (or a bare `*`)
+ * would also restyle everything inside the Excalidraw canvas, which ships its
+ * own focus and motion treatment.
+ */
+.exd-sidebar :focus-visible,
+.exd-topbar :focus-visible,
+.exd-empty :focus-visible,
+.exd-notice :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--radius);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exd-sidebar,
+  .exd-sidebar *,
+  .exd-topbar,
+  .exd-topbar * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
