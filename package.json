@@ -11,6 +11,7 @@
     "dev": "concurrently -k -n vite,electron -c cyan,magenta \"vite\" \"wait-on tcp:5178 && electron .\"",
     "build:renderer": "vite build",
     "typecheck": "tsc --noEmit",
+    "test:e2e": "node test/run.cjs",
     "dist": "npm run build:renderer && electron-builder --mac --arm64",
     "dist:intel": "npm run build:renderer && electron-builder --mac --x64"
   },

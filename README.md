@@ -92,6 +92,7 @@ app shows a notice instead of opening it.
 npm install
 npm run dev          # Vite dev server + Electron
 npm run typecheck
+npm run test:e2e     # end-to-end tests, run locally before a release
 ```
 
 Built with [Electron](https://www.electronjs.org), [React](https://react.dev),

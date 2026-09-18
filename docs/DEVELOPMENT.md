@@ -11,6 +11,7 @@ npm run dev          # Vite dev server + Electron
 npm run typecheck    # tsc --noEmit
 npm run dist         # .dmg for Apple Silicon, in release/
 npm run dist:intel   # .dmg for Intel
+npm run test:e2e     # end-to-end tests (needs a real screen; see test/README.md)
 ```
 
 ## Layout
@@ -30,6 +31,8 @@ src/debug.ts           load timeline log
 src/types.ts           OpenFile and the window.api contract
 src/styles.css         app chrome tokens + tab styles
 vite.config.mts        renderer bundle config, font copying
+test/                  end-to-end tests — see test/README.md
+tools/                 one-off generators: icon, test fixtures, demo GIF
 ```
 
 ## Security
@@ -413,9 +416,26 @@ traffic-light corner anymore, so a 38px glass top bar takes over that job and pu
 down by the same amount. Excalidraw's toolbar never slides under the window buttons. This state is
 saved with the session and kept on the next launch.
 
+## Tests
+
+`test/` boots the real main process against the built `dist/` and drives the app with real clicks
+and keystrokes, so the suites assert about files on disk rather than about the UI. They need a
+screen and they take focus — local runs before a release, not CI. `test/README.md` has the details;
+every suite there exists because the bug it describes actually happened.
+
+```bash
+npm run build:renderer
+npm run test:e2e
+npm run test:e2e -- closing security
+```
+
+`tools/` holds the generators that are not tests: `make-icon.cjs` draws `build/icon.png`,
+`make-fixtures.cjs` regenerates `test/fixtures/`, `record-demo.cjs` records `docs/demo.gif`. Each
+file's header says how to run it. They write to `tools/.out/`, which is ignored.
+
 ## Icon
 
-There is a single `build/icon.png` (1024×1024, with alpha). When you run `npm run dist` on macOS,
+There is a single `build/icon.png` (1024×1024, with alpha), drawn by `tools/make-icon.cjs`. When you run `npm run dist` on macOS,
 electron-builder converts it to `.icns` and puts it in the app bundle. To replace it, overwrite the
 same path with a 1024×1024 PNG.
 
