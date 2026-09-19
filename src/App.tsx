@@ -678,12 +678,10 @@ export default function App() {
     setActivePath(path); // unsaved work lives in sceneCache
   }, []);
 
+  // `path` is bound at the render site, not read from the active tab: a late
+  // change belongs to the canvas that produced it, not to the tab now showing.
   const onChange = useCallback(
-    (elements: readonly any[], appState: any, sceneFiles: any) => {
-      const path = activeRef.current;
-      if (!path) {
-        return;
-      }
+    (path: string, elements: readonly any[], appState: any, sceneFiles: any) => {
       /*
        * Excalidraw keeps deleted elements around for undo. Written to the file
        * they would also leave the scene looking changed forever — an abandoned
@@ -1095,7 +1093,9 @@ export default function App() {
                   libraryItems: libraryRef.current,
                 };
               })()}
-              onChange={onChange}
+              onChange={(elements: readonly any[], appState: any, files: any) =>
+                onChange(active.path, elements, appState, files)
+              }
               onLibraryChange={onLibraryChange}
               onLinkOpen={onLinkOpen}
               libraryReturnUrl={libraryReturnUrl}

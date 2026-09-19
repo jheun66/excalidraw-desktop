@@ -90,6 +90,15 @@ page.
   abandoned, so `before-quit` sets a `quitting` flag and the window's `closed` handler calls
   `app.quit()` again. Cancelling the prompt, or a failed save, clears the flag — otherwise the next
   ordinary window close would quit the app.
+- **A change belongs to the canvas that produced it**, not to the tab that happens to be active.
+  `onChange` takes the path as an argument, bound at the render site, instead of reading
+  `activeRef`. The two cannot disagree today: the canvas is keyed by path, so switching tabs deletes
+  one instance and creates another in the same commit, and Excalidraw calls `onChange` from exactly
+  one place — the tail of `componentDidUpdate` — which React never runs on a deleted fiber. But that
+  rests on Excalidraw keeping the call synchronous and on nothing above the canvas rendering in a
+  transition, and if either changed the failure would be silent: a change from the file just left
+  lands in the new file's `sceneCache`, and the next ⌘S writes one drawing over another. Passing the
+  path costs nothing, so it is not left to the scheduler.
 - **Change detection** (`signature.ts`): two kinds of fields are left out of the signature.
 
   1. **Bookkeeping** — `version`, `versionNonce`, `updated`. `getSceneVersion` also counts the
